@@ -23,7 +23,7 @@ func (t ActiveListeningTrace) TraceInterface() {}
 // has been in fact observed by the node
 type EventObservedTrace struct {
 	Node  *bpmn.CatchEvent
-	Event event.ProcessEvent
+	Event event.Event
 }
 
 func (t EventObservedTrace) TraceInterface() {}
