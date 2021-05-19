@@ -36,8 +36,8 @@ func TestNewFlowNode(t *testing.T) {
 			node, err := New(proc.(*bpmn.Process),
 				&defaultDefinitions,
 				&flowNode.(*bpmn.ParallelGateway).FlowNode,
-				event.VoidProcessEventConsumer{},
-				event.VoidProcessEventSource{},
+				event.VoidConsumer{},
+				event.VoidSource{},
 				tracing.NewTracer(context.Background()), NewLockedFlowNodeMapping(),
 				&waitGroup,
 			)

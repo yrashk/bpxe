@@ -9,33 +9,66 @@
 package model
 
 import (
+	"sync"
+
 	"bpxe.org/pkg/bpmn"
+	"bpxe.org/pkg/event"
 	"bpxe.org/pkg/id"
 	"bpxe.org/pkg/process"
 )
 
 type Model struct {
-	Element   *bpmn.Definitions
-	processes []process.Process
+	Element              *bpmn.Definitions
+	processes            []process.Process
+	eventConsumersLock   sync.RWMutex
+	eventConsumers       []event.Consumer
+	idGeneratorBuilder   id.GeneratorBuilder
+	eventInstanceBuilder event.InstanceBuilder
 }
 
-func New(element *bpmn.Definitions) *Model {
-	return NewWithIdGenerator(element, id.DefaultIdGeneratorBuilder)
+type Option func(*Model)
+
+func WithIdGenerator(builder id.GeneratorBuilder) Option {
+	return func(model *Model) {
+		model.idGeneratorBuilder = builder
+	}
 }
 
-func NewWithIdGenerator(element *bpmn.Definitions, idGeneratorBuilder id.GeneratorBuilder) *Model {
+func WithEventInstanceBuilder(builder event.InstanceBuilder) Option {
+	return func(model *Model) {
+		model.eventInstanceBuilder = builder
+	}
+}
+
+func New(element *bpmn.Definitions, options ...Option) *Model {
 	procs := element.Processes()
-	processes := make([]process.Process, len(*procs))
+	model := &Model{
+		Element: element,
+	}
+
+	for _, option := range options {
+		option(model)
+	}
+
+	if model.idGeneratorBuilder == nil {
+		model.idGeneratorBuilder = id.DefaultIdGeneratorBuilder
+	}
+
+	model.processes = make([]process.Process, len(*procs))
 	for i := range *procs {
-		processes[i] = process.Make(&(*procs)[i], element, idGeneratorBuilder)
+		model.processes[i] = process.Make(&(*procs)[i], element,
+			process.WithIdGenerator(model.idGeneratorBuilder),
+			process.WithEventIngress(model), process.WithEventEgress(model),
+			process.WithEventInstanceBuilder(model),
+		)
 	}
-	return &Model{
-		Element:   element,
-		processes: processes,
-	}
+	return model
 }
 
 func (model *Model) Run() {
+	/*for i := range *model.Element.Processes() {
+		instantiatingFlowNodes := (*model.Element.Processes())[i].InstantiatingFlowNodes()
+	}*/
 }
 
 func (model *Model) FindProcessBy(f func(*process.Process) bool) (result *process.Process, found bool) {
@@ -47,4 +80,26 @@ func (model *Model) FindProcessBy(f func(*process.Process) bool) (result *proces
 		}
 	}
 	return
+}
+
+func (model *Model) ConsumeEvent(ev event.Event) (result event.ConsumptionResult, err error) {
+	model.eventConsumersLock.RLock()
+	result, err = event.ForwardProcessEvent(ev, &model.eventConsumers)
+	model.eventConsumersLock.RUnlock()
+	return
+}
+
+func (model *Model) RegisterEventConsumer(ev event.Consumer) (err error) {
+	model.eventConsumersLock.Lock()
+	model.eventConsumers = append(model.eventConsumers, ev)
+	model.eventConsumersLock.Unlock()
+	return
+}
+
+func (model *Model) NewEventInstance(def bpmn.EventDefinitionInterface) event.Instance {
+	if model.eventInstanceBuilder != nil {
+		return model.eventInstanceBuilder.NewEventInstance(def)
+	} else {
+		return event.NewInstance(def)
+	}
 }

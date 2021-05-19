@@ -27,8 +27,8 @@ type Wiring struct {
 	Definitions  *bpmn.Definitions
 	Incoming     []sequence_flow.SequenceFlow
 	Outgoing     []sequence_flow.SequenceFlow
-	EventIngress event.ProcessEventConsumer
-	EventEgress  event.ProcessEventSource
+	EventIngress event.Consumer
+	EventEgress  event.Source
 	Tracer       *tracing.Tracer
 	Process      *bpmn.Process
 	*FlowNodeMapping
@@ -58,8 +58,8 @@ func sequenceFlows(process *bpmn.Process,
 func New(process *bpmn.Process,
 	definitions *bpmn.Definitions,
 	flowNode *bpmn.FlowNode,
-	eventIngress event.ProcessEventConsumer,
-	eventEgress event.ProcessEventSource,
+	eventIngress event.Consumer,
+	eventEgress event.Source,
 	tracer *tracing.Tracer,
 	flowNodeMapping *FlowNodeMapping,
 	flowWaitGroup *sync.WaitGroup,

@@ -18,7 +18,7 @@ import (
 
 type erroringConsumer struct{}
 
-func (c erroringConsumer) ConsumeProcessEvent(ProcessEvent) (ConsumptionResult, error) {
+func (c erroringConsumer) ConsumeEvent(Event) (ConsumptionResult, error) {
 	return ConsumptionError, errors.New("some error")
 }
 
@@ -29,11 +29,11 @@ func (t testEvent) MatchesEventInstance(instance Instance) bool {
 }
 
 func TestForwardProcessEvent(t *testing.T) {
-	someErroringConsumers := []ProcessEventConsumer{erroringConsumer{},
-		VoidProcessEventConsumer{}}
-	noErroringConsumers := []ProcessEventConsumer{VoidProcessEventConsumer{},
-		VoidProcessEventConsumer{}}
-	allErroringConsumers := []ProcessEventConsumer{erroringConsumer{},
+	someErroringConsumers := []Consumer{erroringConsumer{},
+		VoidConsumer{}}
+	noErroringConsumers := []Consumer{VoidConsumer{},
+		VoidConsumer{}}
+	allErroringConsumers := []Consumer{erroringConsumer{},
 		erroringConsumer{}}
 	var result ConsumptionResult
 	var multiErr *multierror.Error

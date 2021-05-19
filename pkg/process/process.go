@@ -12,52 +12,88 @@ import (
 	"bpxe.org/pkg/bpmn"
 	"bpxe.org/pkg/event"
 	"bpxe.org/pkg/id"
+	"bpxe.org/pkg/process/instance"
 )
 
 type Process struct {
-	Element     *bpmn.Process
-	Definitions *bpmn.Definitions
-	id.GeneratorBuilder
-	instances            []*Instance
+	Element              *bpmn.Process
+	Definitions          *bpmn.Definitions
+	instances            []*instance.Instance
+	EventIngress         event.Consumer
+	EventEgress          event.Source
+	idGeneratorBuilder   id.GeneratorBuilder
 	eventInstanceBuilder event.InstanceBuilder
 }
 
-func (process *Process) SetEventInstanceBuilder(eventInstanceBuilder event.InstanceBuilder) {
-	process.eventInstanceBuilder = eventInstanceBuilder
-}
+type Option func(*Process)
 
-func Make(element *bpmn.Process, definitions *bpmn.Definitions, idGeneratorBuilder id.GeneratorBuilder) Process {
-	return Process{
-		Element:          element,
-		Definitions:      definitions,
-		GeneratorBuilder: idGeneratorBuilder,
-		instances:        make([]*Instance, 0),
+func WithIdGenerator(builder id.GeneratorBuilder) Option {
+	return func(process *Process) {
+		process.idGeneratorBuilder = builder
 	}
 }
 
-func New(element *bpmn.Process, definitions *bpmn.Definitions) *Process {
-	return NewWithIdGeneratorBuilder(element, definitions, id.DefaultIdGeneratorBuilder)
+func WithEventIngress(consumer event.Consumer) Option {
+	return func(process *Process) {
+		process.EventIngress = consumer
+	}
 }
 
-func NewWithIdGeneratorBuilder(element *bpmn.Process, definitions *bpmn.Definitions,
-	idGeneratorBuilder id.GeneratorBuilder) *Process {
-	process := Make(element, definitions, idGeneratorBuilder)
+func WithEventEgress(source event.Source) Option {
+	return func(process *Process) {
+		process.EventEgress = source
+	}
+}
+
+func WithEventInstanceBuilder(builder event.InstanceBuilder) Option {
+	return func(process *Process) {
+		process.eventInstanceBuilder = builder
+	}
+}
+
+func Make(element *bpmn.Process, definitions *bpmn.Definitions, options ...Option) Process {
+	process := Process{
+		Element:     element,
+		Definitions: definitions,
+		instances:   make([]*instance.Instance, 0),
+	}
+
+	for _, option := range options {
+		option(&process)
+	}
+
+	if process.idGeneratorBuilder == nil {
+		process.idGeneratorBuilder = id.DefaultIdGeneratorBuilder
+	}
+
+	if process.eventInstanceBuilder == nil {
+		process.eventInstanceBuilder = event.DefaultInstanceBuilder{}
+	}
+
+	if process.EventIngress == nil && process.EventEgress == nil {
+		fanOut := event.NewFanOut()
+		process.EventIngress = fanOut
+		process.EventEgress = fanOut
+	}
+	return process
+}
+
+func New(element *bpmn.Process, definitions *bpmn.Definitions, options ...Option) *Process {
+	process := Make(element, definitions, options...)
 	return &process
 }
 
-func (process *Process) Instantiate(options ...InstanceOption) (instance *Instance, err error) {
-	instance, err = NewInstance(process, options...)
+func (process *Process) Instantiate(options ...instance.Option) (inst *instance.Instance, err error) {
+	options = append([]instance.Option{
+		instance.WithIdGenerator(process.idGeneratorBuilder),
+		instance.WithEventInstanceBuilder(process.eventInstanceBuilder),
+		instance.WithEventEgress(process.EventEgress),
+		instance.WithEventIngress(process.EventIngress),
+	}, options...)
+	inst, err = instance.NewInstance(process.Element, process.Definitions, options...)
 	if err != nil {
 		return
 	}
 
 	return
-}
-
-func (process *Process) NewEventInstance(def bpmn.EventDefinitionInterface) event.Instance {
-	if process.eventInstanceBuilder != nil {
-		return process.eventInstanceBuilder.NewEventInstance(def)
-	} else {
-		return event.NewInstance(def)
-	}
 }

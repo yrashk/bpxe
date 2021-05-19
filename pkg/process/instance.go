@@ -34,7 +34,6 @@ import (
 
 type Instance struct {
 	process                    *Process
-	eventConsumers             []event.ProcessEventConsumer
 	Tracer                     *tracing.Tracer
 	flowNodeMapping            *flow_node.FlowNodeMapping
 	flowWaitGroup              sync.WaitGroup
@@ -46,6 +45,10 @@ type Instance struct {
 	dataObjectReferences       map[bpmn.Id]data.ItemAware
 	propertiesByName           map[string]data.ItemAware
 	properties                 map[bpmn.Id]data.ItemAware
+}
+
+func (instance *Instance) ConsumeEvent(event event.Event) (event.ConsumptionResult, error) {
+	return instance.process.EventIngress.ConsumeEvent(event)
 }
 
 func (instance *Instance) FindItemAwareById(id bpmn.IdRef) (itemAware data.ItemAware, found bool) {
@@ -128,11 +131,8 @@ func (instance *Instance) FlowNodeMapping() *flow_node.FlowNodeMapping {
 }
 
 func NewInstance(process *Process, options ...InstanceOption) (instance *Instance, err error) {
-	eventConsumers := make([]event.ProcessEventConsumer, 0)
-
 	instance = &Instance{
 		process:                    process,
-		eventConsumers:             eventConsumers,
 		flowNodeMapping:            flow_node.NewLockedFlowNodeMapping(),
 		dataObjectsByName:          make(map[string]data.ItemAware),
 		dataObjectReferencesByName: make(map[string]data.ItemAware),
@@ -233,7 +233,7 @@ func NewInstance(process *Process, options ...InstanceOption) (instance *Instanc
 	wiringMaker := func(element *bpmn.FlowNode) (*flow_node.Wiring, error) {
 		return flow_node.New(process.Element,
 			process.Definitions,
-			element, instance, instance,
+			element, instance.process.EventIngress, instance.process.EventEgress,
 			instance.Tracer, instance.flowNodeMapping,
 			&instance.flowWaitGroup)
 	}
@@ -384,16 +384,6 @@ func NewInstance(process *Process, options ...InstanceOption) (instance *Instanc
 	sender := instance.Tracer.RegisterSender()
 	go instance.ceaseFlowMonitor()(ctx, sender)
 
-	return
-}
-
-func (instance *Instance) ConsumeProcessEvent(ev event.ProcessEvent) (result event.ConsumptionResult, err error) {
-	result, err = event.ForwardProcessEvent(ev, &instance.eventConsumers)
-	return
-}
-
-func (instance *Instance) RegisterProcessEventConsumer(ev event.ProcessEventConsumer) (err error) {
-	instance.eventConsumers = append(instance.eventConsumers, ev)
 	return
 }
 

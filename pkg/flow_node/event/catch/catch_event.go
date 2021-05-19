@@ -29,7 +29,7 @@ type nextActionMessage struct {
 func (m nextActionMessage) message() {}
 
 type processEventMessage struct {
-	event event.ProcessEvent
+	event event.Event
 }
 
 func (m processEventMessage) message() {}
@@ -64,7 +64,7 @@ func New(ctx context.Context, wiring *flow_node.Wiring, catchEvent *bpmn.CatchEv
 	}
 	sender := node.Tracer.RegisterSender()
 	go node.runner(ctx, sender)
-	err = node.EventEgress.RegisterProcessEventConsumer(node)
+	err = node.EventEgress.RegisterEventConsumer(node)
 	if err != nil {
 		return
 	}
@@ -125,8 +125,8 @@ loop:
 	}
 }
 
-func (node *Node) ConsumeProcessEvent(
-	ev event.ProcessEvent,
+func (node *Node) ConsumeEvent(
+	ev event.Event,
 ) (result event.ConsumptionResult, err error) {
 	node.runnerChannel <- processEventMessage{event: ev}
 	result = event.Consumed

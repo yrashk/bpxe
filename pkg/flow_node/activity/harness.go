@@ -44,10 +44,10 @@ type Harness struct {
 	active         int32
 	cancellation   sync.Once
 	lock           sync.RWMutex
-	eventConsumers []event.ProcessEventConsumer
+	eventConsumers []event.Consumer
 }
 
-func (node *Harness) ConsumeProcessEvent(ev event.ProcessEvent) (result event.ConsumptionResult, err error) {
+func (node *Harness) ConsumeEvent(ev event.Event) (result event.ConsumptionResult, err error) {
 	node.lock.RLock()
 	defer node.lock.RUnlock()
 	if atomic.LoadInt32(&node.active) == 1 {
@@ -58,7 +58,7 @@ func (node *Harness) ConsumeProcessEvent(ev event.ProcessEvent) (result event.Co
 	return
 }
 
-func (node *Harness) RegisterProcessEventConsumer(consumer event.ProcessEventConsumer) (err error) {
+func (node *Harness) RegisterEventConsumer(consumer event.Consumer) (err error) {
 	node.lock.Lock()
 	defer node.lock.Unlock()
 	node.eventConsumers = append(node.eventConsumers, consumer)
@@ -102,7 +102,7 @@ func NewHarness(ctx context.Context,
 		activeBoundary: activity.ActiveBoundary(),
 	}
 
-	err = node.EventEgress.RegisterProcessEventConsumer(node)
+	err = node.EventEgress.RegisterEventConsumer(node)
 	if err != nil {
 		return
 	}

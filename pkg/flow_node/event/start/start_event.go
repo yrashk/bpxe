@@ -57,7 +57,7 @@ func New(ctx context.Context, wiring *flow_node.Wiring, startEvent *bpmn.StartEv
 	}
 	sender := node.Tracer.RegisterSender()
 	go node.runner(ctx, sender)
-	err = node.EventEgress.RegisterProcessEventConsumer(node)
+	err = node.EventEgress.RegisterEventConsumer(node)
 	if err != nil {
 		return
 	}
@@ -93,8 +93,8 @@ func (node *Node) runner(ctx context.Context, sender tracing.SenderHandle) {
 	}
 }
 
-func (node *Node) ConsumeProcessEvent(
-	ev event.ProcessEvent,
+func (node *Node) ConsumeEvent(
+	ev event.Event,
 ) (result event.ConsumptionResult, err error) {
 	result = event.Consumed
 	return
